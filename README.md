@@ -14,6 +14,27 @@ Here's an example of what you can do when it's connected to Claude.
 
 > *Caution:* as with many MCP servers, the WhatsApp MCP is subject to [the lethal trifecta](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/). This means that project injection could lead to private data exfiltration.
 
+## Security hardening (this fork)
+
+This fork closes several holes in the original bridge and MCP server:
+
+| Issue | Fix |
+|---|---|
+| The bridge API listened on every network interface with no login | It listens on `127.0.0.1` only and every request needs a bearer token. The token is created on first run in `whatsapp-bridge/store/api_token` (mode 600) and the MCP server reads it from there. You can set `WHATSAPP_BRIDGE_TOKEN` (32+ characters) for both processes instead. |
+| Any website open in your browser could call the API | Requests carrying browser headers (`Origin`, `Sec-Fetch-Site`), a non-localhost `Host` (DNS rebinding) or a body that isn't `application/json` are rejected. |
+| `send_file` could send **any** file on the machine (SSH keys, the WhatsApp session DB...) | Files can only be sent from the outbox directory, `whatsapp-bridge/outbox/` by default (`WHATSAPP_OUTBOX_DIR` to change it, set to the same value for both processes). Symlinks out of it are refused. Copy a file there before asking Claude to send it. |
+| A file sent to you with a name like `../../.zshrc` was written outside the media folder | Incoming file names and chat IDs are reduced to a single safe path component, and the final path is checked. |
+| Session keys, message DB and media were readable by other users | `store/` is mode 700, databases and media files are 600. |
+| Message text was printed to the terminal | The bridge logs metadata only. |
+| A malformed `.ogg` file could crash the voice-note parser | Bounds are checked. (This also fixes the voice-note duration being read from the wrong offset.) |
+
+Optional settings that further limit what a prompt-injected model can do:
+
+- `WHATSAPP_ALLOWED_RECIPIENTS` (bridge): comma-separated phone numbers or JIDs. When set, the bridge refuses to send to anyone else, e.g. `WHATSAPP_ALLOWED_RECIPIENTS=15551234567,120363000000000000@g.us go run main.go`.
+- `WHATSAPP_MCP_READ_ONLY=1` (MCP server): removes `send_message`, `send_file` and `send_audio_message` entirely. Add it under `"env"` in your MCP client config.
+
+Prompt injection itself can't be fixed in code: anyone who messages you can put instructions in front of the model. Keep tool approval manual for the send tools, and prefer read-only mode if you mainly want to search and summarize.
+
 ## Installation
 
 ### Prerequisites

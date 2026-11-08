@@ -35,7 +35,8 @@ def convert_to_opus_ogg(input_file, output_file=None, bitrate="32k", sample_rate
     # Build the ffmpeg command
     cmd = [
         "ffmpeg",
-        "-i", input_file,
+        "-nostdin",
+        "-i", os.path.abspath(input_file),
         "-c:a", "libopus",
         "-b:a", bitrate,
         "-ar", str(sample_rate),
@@ -44,7 +45,7 @@ def convert_to_opus_ogg(input_file, output_file=None, bitrate="32k", sample_rate
         "-compression_level", "10",  # Maximum compression
         "-frame_duration", "60",     # 60ms frames (good for voice)
         "-y",                        # Overwrite output file if it exists
-        output_file
+        os.path.abspath(output_file)
     ]
     
     try:
@@ -61,7 +62,7 @@ def convert_to_opus_ogg(input_file, output_file=None, bitrate="32k", sample_rate
         raise RuntimeError(f"Failed to convert audio. You likely need to install ffmpeg {e.stderr}")
 
 
-def convert_to_opus_ogg_temp(input_file, bitrate="32k", sample_rate=24000):
+def convert_to_opus_ogg_temp(input_file, bitrate="32k", sample_rate=24000, temp_dir=None):
     """
     Convert an audio file to Opus format in an Ogg container and store in a temporary file.
     
@@ -78,7 +79,8 @@ def convert_to_opus_ogg_temp(input_file, bitrate="32k", sample_rate=24000):
         RuntimeError: If the ffmpeg conversion fails
     """
     # Create a temporary file with .ogg extension
-    temp_file = tempfile.NamedTemporaryFile(suffix=".ogg", delete=False)
+    # temp_dir lets callers place the file in the bridge's outbox
+    temp_file = tempfile.NamedTemporaryFile(suffix=".ogg", delete=False, dir=temp_dir)
     temp_file.close()
     
     try:

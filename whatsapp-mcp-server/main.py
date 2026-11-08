@@ -1,3 +1,4 @@
+import os
 from typing import List, Dict, Any, Optional
 from mcp.server.fastmcp import FastMCP
 from whatsapp import (
@@ -17,6 +18,18 @@ from whatsapp import (
 
 # Initialize FastMCP server
 mcp = FastMCP("whatsapp")
+
+# WHATSAPP_MCP_READ_ONLY=1 removes every tool that can send anything. Message
+# text from other people reaches the model, so a crafted message could try to
+# make it send your data elsewhere; with no send tools that can't happen.
+READ_ONLY = os.environ.get("WHATSAPP_MCP_READ_ONLY", "").strip().lower() in ("1", "true", "yes")
+
+
+def send_tool():
+    """Register a sending tool unless read-only mode is on."""
+    if READ_ONLY:
+        return lambda f: f
+    return mcp.tool()
 
 @mcp.tool()
 def search_contacts(query: str) -> List[Dict[str, Any]]:
@@ -154,7 +167,7 @@ def get_message_context(
     context = whatsapp_get_message_context(message_id, before, after)
     return context
 
-@mcp.tool()
+@send_tool()
 def send_message(
     recipient: str,
     message: str
@@ -183,14 +196,15 @@ def send_message(
         "message": status_message
     }
 
-@mcp.tool()
+@send_tool()
 def send_file(recipient: str, media_path: str) -> Dict[str, Any]:
     """Send a file such as a picture, raw audio, video or document via WhatsApp to the specified recipient. For group messages use the JID.
     
     Args:
         recipient: The recipient - either a phone number with country code but no + or other symbols,
                  or a JID (e.g., "123456789@s.whatsapp.net" or a group JID like "123456789@g.us")
-        media_path: The absolute path to the media file to send (image, video, document)
+        media_path: The absolute path to the media file to send (image, video, document).
+                 For safety it must be inside the bridge's outbox directory.
     
     Returns:
         A dictionary containing success status and a status message
@@ -203,14 +217,15 @@ def send_file(recipient: str, media_path: str) -> Dict[str, Any]:
         "message": status_message
     }
 
-@mcp.tool()
+@send_tool()
 def send_audio_message(recipient: str, media_path: str) -> Dict[str, Any]:
     """Send any audio file as a WhatsApp audio message to the specified recipient. For group messages use the JID. If it errors due to ffmpeg not being installed, use send_file instead.
     
     Args:
         recipient: The recipient - either a phone number with country code but no + or other symbols,
                  or a JID (e.g., "123456789@s.whatsapp.net" or a group JID like "123456789@g.us")
-        media_path: The absolute path to the audio file to send (will be converted to Opus .ogg if it's not a .ogg file)
+        media_path: The absolute path to the audio file to send (will be converted to Opus .ogg if it's not a .ogg file).
+                 For safety it must be inside the bridge's outbox directory.
     
     Returns:
         A dictionary containing success status and a status message

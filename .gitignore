@@ -1,3 +1,6 @@
 *.db
 claude_desktop_config.json
 whatsapp.log
+# Secrets and private data created by the bridge
+whatsapp-bridge/store/
+whatsapp-bridge/outbox/
